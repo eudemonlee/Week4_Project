@@ -1,0 +1,105 @@
+#Practical machine learning: Prediction assignment, Week 4 Project
+
+##3rd July, 2017
+
+##J.Li
+
+==============================================================================
+
+#Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+The training data are available as follows:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available as follows:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r cache=T}
+library(caret)
+library(rpart)
+library(randomForest)
+library(rpart.plot)
+```
+
+#Loading Data
+We load the training and testing data and replace the missing values by "NA".
+```{r cache=T}
+urlTraining <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTesting <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(url(urlTraining), na.strings = c("NA", "#DIV0!" , ""))
+testing <- read.csv(url(urlTesting), na.strings = c("NA", "#DIV0!", ""))
+```
+Let's define the same columns
+```{r cache=T}
+sameColumns <- colnames(training) == colnames(testing)
+colnames(training)[sameColumns==FALSE]
+```
+
+Note that "classe" is not included in the testing data.
+
+#Cleaning data
+```{r cache=T}
+training<-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+```
+
+We deleted the first 7 variables which are not related to prediction.
+```{r cache=T}
+training <- training[,8:dim(training)[2]]
+testing <- testing[,8:dim(testing)[2]]
+```
+
+#Cross Validation
+We devide training dataset into three portions for different purposes: trainning 60%, testing 20%, and validation 20%.
+```{r cache=T}
+set.seed(12345)
+dataset1 <- createDataPartition(y = training$classe, p = 0.8, list = F)
+dataset2 <- training[dataset1,]
+validation <- training[-dataset1,]
+trainingdata1 <- createDataPartition(y = dataset2$classe, p = 0.75, list = F)
+trainingdata2 <- dataset2[trainingdata1,]
+testingdata <- dataset2[-trainingdata1,]
+```
+
+##Random forest model
+```{r cache=T}
+forestModel <- randomForest(classe ~ ., data=trainingdata2, method="class")
+predictionForest <- predict(forestModel, testingdata, type="class")
+randomForestModel <- confusionMatrix(predictionForest, testingdata$classe)
+randomForestModel
+```
+
+```{r}
+accuracy1 <- round(randomForestModel$overall['Accuracy'] * 100, 2)
+error1 <- round(1 - randomForestModel$overall['Accuracy'],2)
+accuracy1
+error1
+```
+
+```{r cache=T}
+plot(forestModel, main = "Random Forest Model")
+```
+
+##Decision Tree Model
+```{r cache=T}
+modelTree <- rpart(classe ~ ., data=trainingdata2, method="class")
+predictionTree <- predict(modelTree, testingdata, type="class")
+decisionTree <- confusionMatrix(predictionTree, testingdata$classe)
+decisionTree
+```
+```{r}
+accuracy2 <- round(decisionTree$overall['Accuracy'] * 100, 2)
+error2 <- round(1 - decisionTree$overall['Accuracy'],2)
+accuracy2
+error2
+```
+
+```{r cache=T}
+rpart.plot(modelTree, main = "Decision Tree Model")
+```
+
+#Summary
+In this prediction project, we processed and analyzed both traning and testing datasets in order to establish prediction models and find out their relevent accuracy. We found that the Random Forest produces better accuracy (99.26%) than the Decision Tree does (71.4%).
